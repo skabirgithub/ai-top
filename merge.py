@@ -54,6 +54,8 @@ with mp_holistic.Holistic(
     bored_count_sk = 0
     frustrated_count_sk = 0
     
+    result_trigger = []
+    
 
     time_values = []
     mouse_values = []
@@ -280,7 +282,7 @@ with mp_holistic.Holistic(
         fps = 1 / (ftime - ptime)
         ptime = ftime
 
-        cv2.putText(frameDraw, f'FPS: {int(fps)}', (30, 440), 0, 1, [0, 0, 0], thickness=2, lineType=cv2.LINE_AA)
+        # cv2.putText(frameDraw, f'FPS: {int(fps)}', (30, 440), 0, 1, [0, 0, 0], thickness=2, lineType=cv2.LINE_AA)
         if bboxs:
             x1, y1, w1, h1 = bboxs[0]['bbox']
             cv2.rectangle(frameDraw, bboxs[0]['bbox'], (255, 0, 255), 2)
@@ -326,9 +328,19 @@ with mp_holistic.Holistic(
             bpm_value = bpmBuffer.mean()
             # cv2.putText(frameDraw, f'BPM: {bpm_value:.2f}', bpmTextLocation, font, fontScale, fontColor, lineType)
             if i > bpmBufferSize:
-                cvzone.putTextRect(frameDraw, f'BPM: {bpm_value:.2f}', (videoWidth // 2, 40), scale=2)
+                # cvzone.putTextRect(frameDraw, f'BPM: {bpm_value:.2f}', (videoWidth // 2, 40), scale=2)
+                if result_trigger[-1] == 'engaged':
+                    text_color = (0, 255, 0)  # Green
+                elif result_trigger[-1] == 'bored':
+                    text_color = (0, 0, 255)  # Blue
+                else:
+                    text_color = (255, 0, 0)  # Red
+                cv2.putText(frameDraw, f'{result_trigger[-1]}', (videoWidth // 2, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, text_color, thickness=1, lineType=cv2.LINE_AA)
+                
+                cv2.putText(frameDraw, f'Travel Mouse:{int(calculate_interaction(mouse_values))},Eye:{int(calculate_eye_interaction(left_eye_values).sum())} px', (30, 440), 0, 1, [0, 0, 0], thickness=2, lineType=cv2.LINE_AA)
             else:
-                cvzone.putTextRect(frameDraw, "Calculating BPM...", (30, 40), scale=2)
+                cvzone.putTextRect(frameDraw, "Initiating ...", (30, 40), scale=2)
+                
                 
             if len(sys.argv) != 2:
                 cv2.imshow("AI Top Full", frameDraw)
@@ -522,6 +534,8 @@ with mp_holistic.Holistic(
             data = cleaned_data
             # Extract the last three values from the data array
             last_three_values = data
+            if len(data) > 3:
+                last_three_values = data[-3:]
             # Calculate the first-order derivative of the last three values
             derivative = np.diff(last_three_values)
             # Calculate the median and standard deviation of the derivative
@@ -536,6 +550,8 @@ with mp_holistic.Holistic(
             cleaned_data = [value for value in data if not np.isnan(value)]
             data = cleaned_data
             last_three_values = data
+            if len(data) > 3:
+                last_three_values = data[-3:]
             # Calculate the first-order derivative of the last three values
             derivative = np.diff(last_three_values)
             return np.mean(derivative)
@@ -561,13 +577,16 @@ with mp_holistic.Holistic(
                         if emotion in [4.609785228967667, 56.33133053779602, 0.0022171278033056296]:
                             engagement_count_sk += 1
                             print("Result Engaged")
+                            result_trigger.append('Engaged')
                         else:
                             if emotion in [0.15512987738475204, 1.2489334680140018]:
                                 frustrated_count_sk += 1
                                 print("Result Frustrated")
+                                result_trigger.append('Frustrated')
                             else:
                                 bored_count_sk += 1
                                 print("Result Bored")
+                                result_trigger.append('Bored')
 
             return max(engagement_count_sk, bored_count_sk, frustrated_count_sk)
         
@@ -616,30 +635,39 @@ with mp_holistic.Holistic(
         # if engagement_count_sk > 10:
         #     print("aaaaaaaaaaaaa",array_distg)
     
-    create_real_time_dashboard( array_distg[-100:], mouse_interaction_distancesk[-100:],  heart_mean_diffsk[-100:], array_distg[-100:],'update')
-
-
-    obtains_data = pd.DataFrame({
-    'Time': time_values,
-    'Mouse': mouse_values,
-    'Reaction': reaction_values,
-    'Left eye': left_eye_values,
-    'Right eye': right_eye_values,
-    'Keyboard': keyboard_values,
-    'Heart Rate': heart_rate_values
-    })
     
-    #print(obtains_data)
-    file_name = 'ObtainsData.xlsx'
+
+
+    print('result_trigger',result_trigger)
+    pd.DataFrame(result_trigger).to_csv("score.csv")
+
+    # obtains_data = pd.DataFrame({
+    # 'Time': time_values,
+    # 'Mouse': mouse_values,
+    # 'Reaction': reaction_values,
+    # 'Left eye': left_eye_values,
+    # 'Right eye': right_eye_values,
+    # 'Keyboard': keyboard_values,
+    # 'Heart Rate': heart_rate_values,
+    # 'Engagement': result_trigger
+    # })
+    
+    # #print(obtains_data)
+    # file_name = 'ObtainsData.xlsx'
             
-    #saving the excel
-    obtains_data.to_excel(file_name)
+    # #saving the excel
+    # obtains_data.to_excel(file_name)
+    
+    # pd.DataFrame(result_trigger).to_csv("score.csv")
     # print('DataFrame is written to Excel File successfully.')
     # When everything is done, release the capture
     cam.release()
     cv2.destroyAllWindows()
     keyboard_listener.stop()
+    
+    
 
+    create_real_time_dashboard( array_distg[-100:], mouse_interaction_distancesk[-100:],  heart_mean_diffsk[-100:], array_distg[-100:],'update')
     #print(mouse_values)
 
     score_sum = engagement_count_sk + bored_count_sk + frustrated_count_sk
@@ -651,6 +679,27 @@ with mp_holistic.Holistic(
     print('Engagement Score',engagement_count_pr)
     print('Boredom Score',(bored_count_sk * 100/score_sum))
     print('Frustration Score',(frustrated_count_sk * 100/score_sum))
+    
+    
+    # Define the message using f-string
+    message = f"Engagement Score: {(engagement_count_sk * 100/score_sum)}%\n" \
+            f"Boredom Score: {(bored_count_sk * 100/score_sum)}%\n" \
+            f"Frustration Score: {(frustrated_count_sk * 100/score_sum)}%" 
+
+
+    # # Define the message using f-string
+    # message = f"Left Eye Interaction: {left_eye_interaction}\n" \
+    #         f"Right Eye Interaction: {right_eye_interaction}\n" \
+    #         f"Emotion Median Value: {emotion_median_value}\n" \
+    #         f"Mouse Interaction Distance: {mouse_interaction_distance}\n" \
+    #         f"Keyboard Interaction Score: {keyboard_interaction_score}\n" \
+    #         f"Heart Mean Difference: {heart_mean_diff}\n" \
+    #         f"Result: {classification}"
+
+    # Define the title
+    title = "Engagement Analysis"
+    # Display the message box
+    ctypes.windll.user32.MessageBoxW(0, message, title, 1)
 
         # Function to change the color of a ball based on the percentage
     def change_color_by_percentage(ball_item, percentage):
@@ -709,25 +758,7 @@ with mp_holistic.Holistic(
         # Start the tkinter main loop
     window.mainloop()
  
-   # Define the message using f-string
-    message = f"Engagement Score: {(engagement_count_sk * 100/score_sum)}%\n" \
-            f"Boredom Score: {(bored_count_sk * 100/score_sum)}%\n" \
-            f"Frustration Score: {(frustrated_count_sk * 100/score_sum)}%" 
-
-
-    # # Define the message using f-string
-    # message = f"Left Eye Interaction: {left_eye_interaction}\n" \
-    #         f"Right Eye Interaction: {right_eye_interaction}\n" \
-    #         f"Emotion Median Value: {emotion_median_value}\n" \
-    #         f"Mouse Interaction Distance: {mouse_interaction_distance}\n" \
-    #         f"Keyboard Interaction Score: {keyboard_interaction_score}\n" \
-    #         f"Heart Mean Difference: {heart_mean_diff}\n" \
-    #         f"Result: {classification}"
-
-    # Define the title
-    title = "Engagement Analysis"
-    # Display the message box
-    ctypes.windll.user32.MessageBoxW(0, message, title, 1)
+   
 
 
     
