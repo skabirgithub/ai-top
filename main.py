@@ -28,6 +28,10 @@ class MainApp(tk.Tk):
         self.execute_button.pack(pady=20)
 
         self.checkbox_var.trace("w", self.toggle_button_state)
+        
+        
+
+
 
     def toggle_button_state(self, *args):
         if self.checkbox_var.get():
