@@ -17,7 +17,8 @@ import ctypes
 # Import the real-time dashboard file
 from real_time_dashboard import create_real_time_dashboard
 import tkinter as tk
-
+import requests
+import json
 
 # Face detection and emotion analysis code
 
@@ -186,7 +187,6 @@ with mp_holistic.Holistic(
             filteredFrame = cv2.pyrUp(filteredFrame)
         filteredFrame = filteredFrame[:videoHeight, :videoWidth]
         return filteredFrame
-
 
     while True:
         if keyboard_array:
@@ -685,8 +685,12 @@ with mp_holistic.Holistic(
     message = f"Engagement Score: {(engagement_count_sk * 100/score_sum)}%\n" \
             f"Boredom Score: {(bored_count_sk * 100/score_sum)}%\n" \
             f"Frustration Score: {(frustrated_count_sk * 100/score_sum)}%" 
-
-
+    
+    learningState_data = 1
+    if max([engagement_count_sk,bored_count_sk,frustrated_count_sk])==bored_count_sk:
+        learningState_data = 2
+    if max([engagement_count_sk,bored_count_sk,frustrated_count_sk])==frustrated_count_sk:
+        learningState_data = 3
     # # Define the message using f-string
     # message = f"Left Eye Interaction: {left_eye_interaction}\n" \
     #         f"Right Eye Interaction: {right_eye_interaction}\n" \
@@ -758,7 +762,39 @@ with mp_holistic.Holistic(
         # Start the tkinter main loop
     window.mainloop()
  
-   
+    #API CALLING POST METHOD
+    #Define the URL where you want to send the JSON data
+    url = 'https://softqnrapi20230628122139.azurewebsites.net/api/Students'  # Replace with the actual API endpoint URL
+
+    # Create a Python dictionary with the data you want to send
+    data_to_send = {
+                                    "classId" : "1", # Classroom ID
+                                    "studentId" : "234", # Student ID
+                                    "studentName" : "fahad", # Student Name
+                                    "behaviouralState" : "1", # Status of the student presented in 3 values: 1 green, 2 orange, 3 red
+                                    "learningState" : learningState_data, # Status of the student presented in 3 values: 1 blue, 2 grey, 3 red
+                                    "heartRate" : "75",  # no of heartbeats per minute
+                                    "emotionalState" : "Neutral", # Anger, Fear, Happiness, Sadness, Disgust, Surprise
+                    }
+
+
+    # Convert the Python dictionary to a JSON string
+    json_data = json.dumps(data_to_send)
+
+    # Set the headers to indicate that you are sending JSON data
+    headers = {
+        'Content-Type': 'application/json'
+    }
+
+    # Send a POST request with the JSON data
+    response = requests.post(url, data=json_data, headers=headers)
+
+    # Check the response status code
+    if response.status_code == 200:
+        print('Data sent successfully.')
+    else:
+        print('Failed to send data. Status code:', response.status_code)
+
 
 
     
